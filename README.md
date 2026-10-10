@@ -24,6 +24,11 @@ Static site, no build step, no tracking:
 - `data/days.json` — index of available days
 - `data/YYYY-MM-DD.json` — one file per day
 
+## Automation
+
+- **Daily gather** (`.github/workflows/daily.yml`, ~7:30 AM US Eastern): pulls the last 24h of CVEs, writes `data/YYYY-MM-DD.json`, updates `data/days.json`.
+- **Weekly enrichment** (`.github/workflows/weekly-enrich.yml`, Sundays): re-checks the last 7 days of entries and backfills vendor, product, affected versions, and patch links as NVD finishes analyzing each CVE.
+
 ## Run the gather manually
 
 From the Actions tab: **Daily CVE gather → Run workflow**.

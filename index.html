@@ -8,32 +8,58 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header class="site-header">
-  <div class="wrap">
-    <h1>Everyday CVE</h1>
-    <p class="tagline">Every new CVE, explained — <strong>the problem</strong> and <strong>the solution</strong>. Updated daily.</p>
-    <div class="controls">
-      <select id="daySelect" aria-label="Pick a day"></select>
-      <input id="search" type="search" placeholder="Search CVE, product, keyword…" aria-label="Search">
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 2l8 3.5v5.2c0 5-3.4 9.4-8 10.8-4.6-1.4-8-5.8-8-10.8V5.5L12 2z" stroke="#2dd4bf" stroke-width="1.8"/>
+        <path d="M9.5 12l2 2 3.5-4" stroke="#2dd4bf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Everyday&nbsp;CVE</span>
     </div>
+    <nav class="topbar-links">
+      <a href="https://nvd.nist.gov" target="_blank" rel="noopener">NVD</a>
+      <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener">CISA&nbsp;KEV</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="kicker">Daily threat intelligence</p>
+    <h1>Every new CVE.<br><span class="accent">The problem. The solution.</span></h1>
+    <p class="lede">Each morning we pull the last 24 hours of newly published vulnerabilities, flag what's exploited in the wild, and break down exactly what's wrong and how to fix it.</p>
+    <div class="hero-stats" id="heroStats">
+      <div class="hstat"><span class="hnum" id="stTotal">–</span><span class="hlabel">new today</span></div>
+      <div class="hstat"><span class="hnum crit" id="stCrit">–</span><span class="hlabel">critical</span></div>
+      <div class="hstat"><span class="hnum kev" id="stKev">–</span><span class="hlabel">exploited in the wild</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="controls-bar">
+  <div class="wrap controls-inner">
+    <select id="daySelect" aria-label="Pick a day"></select>
+    <input id="search" type="search" placeholder="Search CVE, vendor, product…" aria-label="Search">
     <div class="pills" id="sevPills">
       <button data-sev="all" class="active">All</button>
       <button data-sev="CRITICAL">Critical</button>
       <button data-sev="HIGH">High</button>
-      <button data-sev="exploited">Exploited in the wild</button>
+      <button data-sev="exploited">Exploited</button>
     </div>
-    <div class="stats" id="stats"></div>
   </div>
-</header>
+</div>
 
 <main class="wrap">
+  <p class="resultline" id="resultline"></p>
   <div id="cards"></div>
   <p class="empty hidden" id="empty">No CVEs match. Try another day or filter.</p>
 </main>
 
 <footer class="site-footer">
   <div class="wrap">
-    <p>Data: <a href="https://nvd.nist.gov" rel="noopener">NVD (NIST)</a> + <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" rel="noopener">CISA KEV</a> · Updated daily · Built by <a href="https://karandarjishack.github.io/kds/" rel="noopener">KDS</a></p>
+    <p>Sources: <a href="https://nvd.nist.gov" target="_blank" rel="noopener">NVD (NIST)</a> · <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener">CISA Known Exploited Vulnerabilities</a> &nbsp;·&nbsp; Updated daily &nbsp;·&nbsp; Built by <a href="https://karandarjishack.github.io/kds/" target="_blank" rel="noopener">KDS — Karandarji Security</a></p>
   </div>
 </footer>
 
