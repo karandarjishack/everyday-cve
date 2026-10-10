@@ -113,6 +113,7 @@ def guess_product(desc):
 
 def products(cve, desc=""):
     prods, vers, seen = [], [], set()
+    vendors = []
     for cfg in cve.get("configurations", []):
         for node in cfg.get("nodes", []):
             for m in node.get("cpeMatch", []):
@@ -122,7 +123,10 @@ def products(cve, desc=""):
                 key = (p[3], p[4])
                 if key not in seen and "*" not in key:
                     seen.add(key)
-                    prods.append(f"{p[3]} {p[4]}".replace("_", " ").strip().title())
+                    vendor = p[3].replace("_", " ").strip().title()
+                    product = p[4].replace("_", " ").strip().title()
+                    vendors.append(vendor)
+                    prods.append(product)
                 rng = []
                 if m.get("versionStartIncluding"): rng.append(">=" + m["versionStartIncluding"])
                 if m.get("versionEndExcluding"): rng.append("<" + m["versionEndExcluding"])
@@ -130,13 +134,36 @@ def products(cve, desc=""):
                 if m.get("versionEndIncluding"): rng.append("<=" + m["versionEndIncluding"])
                 if rng:
                     vers.append(f"{p[4].replace('_',' ')} {' '.join(rng)}")
+    vendor = vendors[0] if vendors else ""
     if not prods:
         g, gv = guess_product(desc)
         if g:
+            m2 = re.match(r"^(.+?) \(WordPress plugin\)$", g)
+            vendor = m2.group(1) if m2 else ""
             prods.append(g)
             if gv:
                 vers.append(f"{g} {gv}")
-    return prods[:3], vers[:2]
+    return vendor, prods[:3], vers[:2]
+
+
+VECTOR_LABELS = {
+    "AV:N": "Remote (network)", "AV:A": "Adjacent network", "AV:L": "Local access", "AV:P": "Physical",
+    "AC:L": "Low complexity", "AC:H": "High complexity",
+    "PR:N": "No privileges needed", "PR:L": "Low privileges needed", "PR:H": "High privileges needed",
+    "UI:N": "No user interaction", "UI:R": "User interaction needed", "UI:A": "Active user interaction",
+    "S:C": "Scope changed", "S:U": "Scope unchanged",
+    "C:H": "High confidentiality impact", "I:H": "High integrity impact", "A:H": "High availability impact",
+}
+
+
+def attack_profile(vector):
+    chips = []
+    for part in (vector or "").split("/"):
+        if part in VECTOR_LABELS:
+            chips.append((part.split(":")[0], VECTOR_LABELS[part]))
+    order = {"AV": 0, "PR": 1, "UI": 2, "AC": 3, "S": 4, "C": 5, "I": 6, "A": 7}
+    chips.sort(key=lambda c: order.get(c[0], 99))
+    return [c[1] for c in chips[:6]]
 
 
 def refs(cve):
@@ -180,7 +207,7 @@ def main():
             continue
         patch, exploit = refs(cve)
         desc = cve.get("descriptions", [{}])[0].get("value", "")
-        prods, vers = products(cve, desc)
+        vendor, prods, vers = products(cve, desc)
         av = re.search(r"AV:([NALP])", vector or "")
         scope = {"N": "remotely over the network", "A": "from the adjacent network",
                  "L": "with local access", "P": "with physical access"}.get(av.group(1) if av else "")
@@ -196,7 +223,9 @@ def main():
             "severity": sev, "score": score if score is not None else "n/a",
             "exploited": in_kev, "exploit_public": bool(exploit),
             "bug_class": ", ".join(labels[:2]),
+            "vendor": vendor,
             "product": ", ".join(prods), "versions": "; ".join(vers),
+            "attack": attack_profile(vector),
             "problem": problem, "solution": solution,
             "patch": patch[0] if patch else "",
             "nvd": f"https://nvd.nist.gov/vuln/detail/{cid}",
