@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Everyday CVE — New vulnerabilities, explained daily</title>
+<meta name="description" content="Every new CVE, explained: the problem, and the solution. Updated daily.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <h1>Everyday CVE</h1>
+    <p class="tagline">Every new CVE, explained — <strong>the problem</strong> and <strong>the solution</strong>. Updated daily.</p>
+    <div class="controls">
+      <select id="daySelect" aria-label="Pick a day"></select>
+      <input id="search" type="search" placeholder="Search CVE, product, keyword…" aria-label="Search">
+    </div>
+    <div class="pills" id="sevPills">
+      <button data-sev="all" class="active">All</button>
+      <button data-sev="CRITICAL">Critical</button>
+      <button data-sev="HIGH">High</button>
+      <button data-sev="exploited">Exploited in the wild</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="cards"></div>
+  <p class="empty hidden" id="empty">No CVEs match. Try another day or filter.</p>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Data: <a href="https://nvd.nist.gov" rel="noopener">NVD (NIST)</a> + <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" rel="noopener">CISA KEV</a> · Updated daily · Built by <a href="https://karandarjishack.github.io/kds/" rel="noopener">KDS</a></p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
