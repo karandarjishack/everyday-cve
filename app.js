@@ -170,6 +170,8 @@ function render() {
       ? `${state.entries.length} vulnerabilities published ${prettyDate(state.day)} — tap any card for the full breakdown`
       : `Showing ${list.length} of ${state.entries.length}`;
 
+  buildTicker();
+
   // featured: top 3 by priority
   const feat = $("featured"), fwrap = $("featuredWrap");
   const top = list.slice(0, 3);
@@ -199,22 +201,53 @@ function render() {
   const sec = $("sections");
   sec.innerHTML = "";
   const groups = [
-    ["Exploited in the wild", list.filter((e) => e.exploited), "kev"],
-    ["Critical", list.filter((e) => !e.exploited && e.severity === "CRITICAL"), "crit"],
-    ["High & medium", list.filter((e) => !e.exploited && e.severity !== "CRITICAL"), ""],
+    ["03", "Exploited in the wild", list.filter((e) => e.exploited), "kev"],
+    ["04", "Critical", list.filter((e) => !e.exploited && e.severity === "CRITICAL"), "crit"],
+    ["05", "High & medium", list.filter((e) => !e.exploited && e.severity !== "CRITICAL"), ""],
   ];
   let n = 0;
-  groups.forEach(([label, items, cls]) => {
+  groups.forEach(([num, label, items, cls]) => {
     if (!items.length) return;
     const h = document.createElement("h2");
-    h.className = `sechead ${cls}`;
-    h.innerHTML = `${esc(label)} <span class="count">${items.length}</span>`;
+    h.className = `sechead ${cls} reveal`;
+    h.innerHTML = `<span class="secnum">${num}</span>${esc(label)} <span class="count">${items.length}</span>`;
     sec.appendChild(h);
     const g = document.createElement("div");
     g.className = "grid";
     items.forEach((e) => g.appendChild(tile(e, n++)));
     sec.appendChild(g);
   });
+  observeReveals();
+}
+
+/* scroll reveals */
+let revealObs = null;
+function observeReveals() {
+  if (!("IntersectionObserver" in window)) {
+    document.querySelectorAll(".reveal").forEach((el) => el.classList.add("in"));
+    return;
+  }
+  if (!revealObs) {
+    revealObs = new IntersectionObserver((ents) => {
+      ents.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("in"); revealObs.unobserve(en.target); } });
+    }, { threshold: 0.08 });
+  }
+  document.querySelectorAll(".reveal:not(.in)").forEach((el) => revealObs.observe(el));
+}
+
+/* threat ticker */
+function buildTicker() {
+  const track = $("tickerTrack");
+  if (!track) return;
+  const items = state.entries
+    .filter((e) => e.severity === "CRITICAL" || e.exploited)
+    .sort(cmpPrio)
+    .slice(0, 30);
+  if (!items.length) { track.innerHTML = ""; return; }
+  const html = items.map((e) =>
+    `<span class="tick-item"><b>${esc(e.id)}</b><span class="ts ${esc(e.severity)}">${esc(e.severity)} ${esc(e.score)}</span><span>${esc((e.vendor || e.product || "").slice(0, 42))}</span></span>`
+  ).join("");
+  track.innerHTML = html + html; // duplicate for seamless loop
 }
 
 /* ---------- modal ---------- */
@@ -227,13 +260,13 @@ function openModal(e) {
       <span class="m-score">${esc(e.score)}</span>
       <span class="m-cve">${esc(e.id)}</span>
       ${e.exploited ? `<span class="m-kev">Exploited in the wild</span>` : ""}
-      ${hit ? `<span class="m-kev" style="background:rgba(45,212,191,.14);color:var(--teal);border-color:rgba(45,212,191,.4)">In your stack</span>` : ""}
+      ${hit ? `<span class="m-stack">In your stack</span>` : ""}
     </div>
     <div class="dgrid">
       <div class="dblock"><div class="k">Vendor</div><div class="v">${esc(e.vendor || "Pending NVD analysis")}</div></div>
       <div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "Pending NVD analysis")}</div></div>
       <div class="dblock"><div class="k">Affected versions</div><div class="v mono">${esc(e.versions || "—")}</div></div>
-      <div class="dblock"><div class="k">Fixed in</div><div class="v mono">${esc(e.fixed_in || "—")}</div></div>
+      <div class="dblock"><div class="k">Fixed in</div><div class="v mono${e.fixed_in ? " fix" : ""}">${esc(e.fixed_in || "See vendor advisory")}</div></div>
       <div class="dblock"><div class="k">Published</div><div class="v mono">${esc(e.date || "—")}</div></div>
       ${e.bug_class ? `<div class="dblock"><div class="k">Bug class</div><div class="v">${esc(e.bug_class)}</div></div>` : ""}
     </div>
