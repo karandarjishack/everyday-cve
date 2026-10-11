@@ -167,6 +167,10 @@ def products(cve, desc=""):
             prods.append(g)
             if gv:
                 vers.append(gv)
+    if not vendor and prods and "(" not in prods[0]:
+        first = prods[0].split(" ")[0]
+        if re.fullmatch(r"[A-Za-z]{3,}", first or ""):
+            vendor = first
     return vendor, prods[:3], vers[:2]
 
 
@@ -238,9 +242,10 @@ def main():
         problem = one_line(desc, 1500) + (f" Attacker needs {scope}." if scope else "")
         solution = next((CWE_FIX[c][1] for c in cw if c in CWE_FIX),
                         "Apply the vendor patch at the earliest maintenance window and confirm the asset is not internet-exposed.")
-        fix = re.search(r"(?:fixed in|update to|patched in)\s+(?:version\s+)?([\d][\d\.\-a-z]*)", desc, re.I)
-        if fix:
-            solution = f"Fixed in version {fix.group(1)} — update immediately. " + solution
+        fixm = re.search(r"(?:fixed in|update to|patched in)\s+(?:version\s+)?([\d][\d\.\-a-z]*)", desc, re.I)
+        fixed_in = fixm.group(1).rstrip(".") if fixm else ""
+        if fixed_in:
+            solution = f"Fixed in version {fixed_in} — update immediately. " + solution
         sev = "CRITICAL" if score and score >= 9.0 else "HIGH" if score and score >= 7.0 else "MEDIUM"
         entries.append({
             "id": cid, "date": cve.get("published", "")[:10],
@@ -249,6 +254,7 @@ def main():
             "bug_class": ", ".join(labels[:2]),
             "vendor": vendor,
             "product": ", ".join(prods), "versions": "; ".join(vers),
+            "fixed_in": fixed_in,
             "attack": attack_profile(vector),
             "problem": problem, "solution": solution,
             "patch": patch[0] if patch else "",
