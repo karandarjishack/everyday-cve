@@ -205,8 +205,12 @@ def refs(cve):
     return patch, exploit
 
 
-def one_line(t, n=280):
+def one_line(t, n=1500):
     t = html.unescape(re.sub(r"\s+", " ", t or "").strip())
+    t = re.sub(r"\s+([.,;:)])", r"\1", t)          # no space before punctuation
+    t = re.sub(r"\bsQL\b", "SQL", t)               # NVD casing glitch
+    if t and not t.endswith((".", "!", "?", "…")):
+        t += "."
     return t if len(t) <= n else t[: n - 1].rstrip() + "…"
 
 
@@ -237,9 +241,11 @@ def main():
         desc = cve.get("descriptions", [{}])[0].get("value", "")
         vendor, prods, vers = products(cve, desc)
         av = re.search(r"AV:([NALP])", vector or "")
-        scope = {"N": "remotely over the network", "A": "from the adjacent network",
-                 "L": "with local access", "P": "with physical access"}.get(av.group(1) if av else "")
-        problem = one_line(desc, 1500) + (f" Attacker needs {scope}." if scope else "")
+        scope = {"N": "Exploitable remotely over the network.",
+                 "A": "Exploitable from the adjacent network.",
+                 "L": "Requires local access to exploit.",
+                 "P": "Requires physical access to exploit."}.get(av.group(1) if av else "")
+        problem = one_line(desc, 1500) + (f" {scope}" if scope else "")
         solution = next((CWE_FIX[c][1] for c in cw if c in CWE_FIX),
                         "Apply the vendor patch at the earliest maintenance window and confirm the asset is not internet-exposed.")
         fixm = re.search(r"(?:fixed in|update to|patched in)\s+(?:version\s+)?([\d][\d\.\-a-z]*)", desc, re.I)
