@@ -155,7 +155,6 @@ main { padding: 8px 0 70px; }
   font-size: 14px; font-weight: 800; letter-spacing: 2.2px; text-transform: uppercase;
   margin: 44px 0 16px; display: flex; align-items: center; gap: 12px;
 }
-.sechead .secnum { font-family: var(--mono); color: var(--accent); font-size: 13px; }
 .sechead .count {
   font-size: 12px; background: var(--panel2); border: 1px solid var(--line);
   border-radius: 999px; padding: 2px 11px; color: var(--muted); letter-spacing: 0;

@@ -151,7 +151,7 @@ function tile(e, i) {
       <span class="score ${esc(e.severity)}">${esc(e.score)}</span>
     </span>
     <span class="cve-id">${esc(e.id)}</span>
-    ${e.vendor ? `<span class="vendor">${esc(e.vendor)}</span>` : ""}
+    ${e.vendor && e.vendor.toLowerCase() !== (e.product || "").toLowerCase() ? `<span class="vendor">${esc(e.vendor)}</span>` : ""}
     <span class="product">${esc(e.product || "Product pending NVD analysis")}${e.versions ? ` <span class="ver">${esc(e.versions)}</span>` : ""}</span>
     <span class="tile-foot">
       ${e.exploited ? `<span class="minichip kevflag">Exploited</span>` : (e.bug_class ? `<span class="minichip">${esc(e.bug_class)}</span>` : `<span></span>`)}
@@ -201,16 +201,16 @@ function render() {
   const sec = $("sections");
   sec.innerHTML = "";
   const groups = [
-    ["03", "Exploited in the wild", list.filter((e) => e.exploited), "kev"],
-    ["04", "Critical", list.filter((e) => !e.exploited && e.severity === "CRITICAL"), "crit"],
-    ["05", "High & medium", list.filter((e) => !e.exploited && e.severity !== "CRITICAL"), ""],
+    ["Exploited in the wild", list.filter((e) => e.exploited), "kev"],
+    ["Critical", list.filter((e) => !e.exploited && e.severity === "CRITICAL"), "crit"],
+    ["High & medium", list.filter((e) => !e.exploited && e.severity !== "CRITICAL"), ""],
   ];
   let n = 0;
-  groups.forEach(([num, label, items, cls]) => {
+  groups.forEach(([label, items, cls]) => {
     if (!items.length) return;
     const h = document.createElement("h2");
     h.className = `sechead ${cls} reveal`;
-    h.innerHTML = `<span class="secnum">${num}</span>${esc(label)} <span class="count">${items.length}</span>`;
+    h.innerHTML = `${esc(label)} <span class="count">${items.length}</span>`;
     sec.appendChild(h);
     const g = document.createElement("div");
     g.className = "grid";
@@ -264,7 +264,7 @@ function openModal(e) {
     </div>
     <div class="dgrid">
       <div class="dblock"><div class="k">Vendor</div><div class="v">${esc(e.vendor || "Pending NVD analysis")}</div></div>
-      <div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "Pending NVD analysis")}</div></div>
+      ${e.vendor && e.product && e.vendor.toLowerCase() === e.product.toLowerCase() ? "" : `<div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "Pending NVD analysis")}</div></div>`}
       <div class="dblock"><div class="k">Affected versions</div><div class="v mono">${esc(e.versions || "—")}</div></div>
       <div class="dblock"><div class="k">Fixed in</div><div class="v mono${e.fixed_in ? " fix" : ""}">${esc(e.fixed_in || "See vendor advisory")}</div></div>
       <div class="dblock"><div class="k">Published</div><div class="v mono">${esc(e.date || "—")}</div></div>
