@@ -255,7 +255,6 @@ main { padding: 8px 0 70px; }
 }
 .stack-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .stack-title { font-weight: 800; font-size: 15px; letter-spacing: 0.4px; }
-.stack-title::before { content: "02"; font-family: var(--mono); color: var(--accent); font-size: 12px; margin-right: 10px; }
 .stack-sub { color: var(--muted); font-size: 13px; }
 .stack-row { display: flex; gap: 10px; }
 .stack-row input {

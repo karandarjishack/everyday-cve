@@ -264,7 +264,7 @@ function openModal(e) {
     </div>
     <div class="dgrid">
       <div class="dblock"><div class="k">Vendor</div><div class="v">${esc(e.vendor || "Pending NVD analysis")}</div></div>
-      ${e.vendor && e.product && e.vendor.toLowerCase() === e.product.toLowerCase() ? "" : `<div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "Pending NVD analysis")}</div></div>`}
+      <div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "Pending NVD analysis")}</div></div>
       <div class="dblock"><div class="k">Affected versions</div><div class="v mono">${esc(e.versions || "—")}</div></div>
       <div class="dblock"><div class="k">Fixed in</div><div class="v mono${e.fixed_in ? " fix" : ""}">${esc(e.fixed_in || "See vendor advisory")}</div></div>
       <div class="dblock"><div class="k">Published</div><div class="v mono">${esc(e.date || "—")}</div></div>
