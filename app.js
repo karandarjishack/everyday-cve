@@ -19,6 +19,9 @@ async function init() {
       state.sev = b.dataset.sev;
       render();
     }));
+  $("modalClose").addEventListener("click", closeModal);
+  $("modalBackdrop").addEventListener("click", (e) => { if (e.target.id === "modalBackdrop") closeModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
   if (days.length) loadDay(days[0]);
 }
 
@@ -64,54 +67,66 @@ function esc(s) {
 
 function render() {
   const list = filtered();
-  const box = $("cards");
-  box.innerHTML = "";
+  const grid = $("grid");
+  grid.innerHTML = "";
   $("empty").classList.toggle("hidden", list.length > 0);
   $("resultline").textContent =
     list.length === state.entries.length
-      ? `${state.entries.length} vulnerabilities published ${prettyDate(state.day)}`
+      ? `${state.entries.length} vulnerabilities published ${prettyDate(state.day)} — tap any card for the full breakdown`
       : `Showing ${list.length} of ${state.entries.length}`;
 
-  list.forEach((e) => {
-    const card = document.createElement("div");
-    card.className = `card sev-${esc(e.severity)}`;
-    const vp = [e.vendor, e.product].filter(Boolean).join(" · ");
-    card.innerHTML = `
-      <button class="card-head" aria-expanded="false">
-        <span class="sevblock"><span class="sev ${esc(e.severity)}">${esc(e.severity)}</span><span class="score">${esc(e.score)}</span></span>
-        <span class="card-main">
-          <span class="cve-id">${esc(e.id)}</span>
-          <span class="cve-sub">${vp ? `<strong>${esc(vp)}</strong>` : `<em>Vendor pending NVD analysis</em>`}</span>
-          <span class="chips">
-            ${e.bug_class ? `<span class="chip">${esc(e.bug_class)}</span>` : ""}
-            ${e.exploited ? `<span class="chip kevflag">Exploited in the wild</span>` : ""}
-          </span>
-        </span>
-        <span class="chev">▾</span>
-      </button>
-      <div class="detail">
-        <div class="dgrid">
-          <div class="dblock"><div class="k">Vendor</div><div class="v">${esc(e.vendor || "—")}</div></div>
-          <div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "—")}</div></div>
-          <div class="dblock"><div class="k">Affected versions</div><div class="v mono">${esc(e.versions || "—")}</div></div>
-          <div class="dblock"><div class="k">Published</div><div class="v mono">${esc(e.date || "—")}</div></div>
-        </div>
-        <div class="dsection problem"><div class="k">The problem</div><p>${esc(e.problem)}</p></div>
-        ${e.attack && e.attack.length ? `<div class="dsection attack"><div class="k">Attack profile</div><div class="atkchips">${e.attack.map((a) => `<span>${esc(a)}</span>`).join("")}</div></div>` : ""}
-        <div class="dsection solution"><div class="k">The solution</div><p>${esc(e.solution)}</p></div>
-        <div class="refbtns">
-          ${e.patch ? `<a href="${esc(e.patch)}" target="_blank" rel="noopener">Vendor patch / advisory</a>` : ""}
-          <a class="ghost" href="${esc(e.nvd)}" target="_blank" rel="noopener">NVD details</a>
-          ${e.exploit_public ? `<a class="ghost" href="https://www.google.com/search?q=${esc(e.id)}+exploit" target="_blank" rel="noopener">Public exploit info</a>` : ""}
-        </div>
-      </div>`;
-    const head = card.querySelector(".card-head");
-    head.addEventListener("click", () => {
-      card.classList.toggle("open");
-      head.setAttribute("aria-expanded", card.classList.contains("open"));
-    });
-    box.appendChild(card);
+  list.forEach((e, i) => {
+    const t = document.createElement("button");
+    t.className = `tile sev-${esc(e.severity)}`;
+    t.setAttribute("aria-label", `${e.id} details`);
+    t.innerHTML = `
+      <span class="tile-top">
+        <span class="sevbadge ${esc(e.severity)}">${esc(e.severity)}</span>
+        <span class="score ${esc(e.severity)}">${esc(e.score)}</span>
+      </span>
+      <span class="cve-id">${esc(e.id)}</span>
+      <span class="vendor">${esc(e.vendor || "Vendor pending")}</span>
+      <span class="product">${esc(e.product || "Product pending NVD analysis")}${e.versions ? ` <span class="ver">${esc(e.versions)}</span>` : ""}</span>
+      <span class="tile-foot">
+        ${e.exploited ? `<span class="minichip kevflag">Exploited</span>` : (e.bug_class ? `<span class="minichip">${esc(e.bug_class)}</span>` : `<span></span>`)}
+        <span class="details-link">Details →</span>
+      </span>`;
+    t.addEventListener("click", () => openModal(e));
+    grid.appendChild(t);
   });
+}
+
+function openModal(e) {
+  const body = $("modalBody");
+  body.innerHTML = `
+    <div class="m-head">
+      <span class="m-sev ${esc(e.severity)}">${esc(e.severity)}</span>
+      <span class="m-score">${esc(e.score)}</span>
+      <span class="m-cve">${esc(e.id)}</span>
+      ${e.exploited ? `<span class="m-kev">Exploited in the wild</span>` : ""}
+    </div>
+    <div class="dgrid">
+      <div class="dblock"><div class="k">Vendor</div><div class="v">${esc(e.vendor || "Pending NVD analysis")}</div></div>
+      <div class="dblock"><div class="k">Product</div><div class="v">${esc(e.product || "Pending NVD analysis")}</div></div>
+      <div class="dblock"><div class="k">Affected versions</div><div class="v mono">${esc(e.versions || "—")}</div></div>
+      <div class="dblock"><div class="k">Published</div><div class="v mono">${esc(e.date || "—")}</div></div>
+      ${e.bug_class ? `<div class="dblock"><div class="k">Bug class</div><div class="v">${esc(e.bug_class)}</div></div>` : ""}
+    </div>
+    <div class="dsection problem"><div class="k">The problem</div><p>${esc(e.problem)}</p></div>
+    ${e.attack && e.attack.length ? `<div class="dsection attack"><div class="k">Attack profile</div><div class="atkchips">${e.attack.map((a) => `<span>${esc(a)}</span>`).join("")}</div></div>` : ""}
+    <div class="dsection solution"><div class="k">The solution</div><p>${esc(e.solution)}</p></div>
+    <div class="refbtns">
+      ${e.patch ? `<a href="${esc(e.patch)}" target="_blank" rel="noopener">Vendor patch / advisory</a>` : ""}
+      <a class="ghost" href="${esc(e.nvd)}" target="_blank" rel="noopener">NVD details</a>
+      ${e.exploit_public ? `<a class="ghost" href="https://www.google.com/search?q=${esc(e.id)}+exploit" target="_blank" rel="noopener">Public exploit info</a>` : ""}
+    </div>`;
+  $("modalBackdrop").classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+function closeModal() {
+  $("modalBackdrop").classList.add("hidden");
+  document.body.classList.remove("modal-open");
 }
 
 init();

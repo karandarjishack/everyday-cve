@@ -29,7 +29,7 @@
   <div class="wrap">
     <p class="kicker">Daily threat intelligence</p>
     <h1>Every new CVE.<br><span class="accent">The problem. The solution.</span></h1>
-    <p class="lede">Each morning we pull the last 24 hours of newly published vulnerabilities, flag what's exploited in the wild, and break down exactly what's wrong and how to fix it.</p>
+    <p class="lede">Each morning we pull the last 24 hours of newly published vulnerabilities, flag what's exploited in the wild, and break down exactly what's wrong and how to fix it — all right here.</p>
     <div class="hero-stats" id="heroStats">
       <div class="hstat"><span class="hnum" id="stTotal">–</span><span class="hlabel">new today</span></div>
       <div class="hstat"><span class="hnum crit" id="stCrit">–</span><span class="hlabel">critical</span></div>
@@ -51,11 +51,18 @@
   </div>
 </div>
 
-<main class="wrap">
+<main class="wrap wide">
   <p class="resultline" id="resultline"></p>
-  <div id="cards"></div>
+  <div id="grid" class="grid"></div>
   <p class="empty hidden" id="empty">No CVEs match. Try another day or filter.</p>
 </main>
+
+<div class="modal-backdrop hidden" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="CVE details">
+    <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
 
 <footer class="site-footer">
   <div class="wrap">
