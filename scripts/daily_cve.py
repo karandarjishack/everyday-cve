@@ -166,7 +166,7 @@ def products(cve, desc=""):
             vendor = gvend or vendor
             prods.append(g)
             if gv:
-                vers.append(f"{g} {gv}")
+                vers.append(gv)
     return vendor, prods[:3], vers[:2]
 
 
