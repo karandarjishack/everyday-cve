@@ -29,6 +29,11 @@ Static site, no build step, no tracking:
 - **Daily gather** (`.github/workflows/daily.yml`, ~7:30 AM US Eastern): pulls the last 24h of CVEs, writes `data/YYYY-MM-DD.json`, updates `data/days.json`.
 - **Weekly enrichment** (`.github/workflows/weekly-enrich.yml`, Sundays): re-checks the last 7 days of entries and backfills vendor, product, affected versions, and patch links as NVD finishes analyzing each CVE.
 
+Vendor/product resolution order (so cards never sit on "Pending NVD analysis"):
+1. NVD's CPE configuration data (most normalized)
+2. The CNA's own affected-product record via the CVE Program API (authoritative from day one)
+3. Description-text regex parsing (heuristic fallback)
+
 ## Run the gather manually
 
 From the Actions tab: **Daily CVE gather → Run workflow**.
