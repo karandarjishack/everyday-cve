@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 NVD = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+CVE_API = "https://cveawg.mitre.org/api/cve"  # CVE Program API (public, no key needed)
 KEV_URL = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
 UA = {"User-Agent": "EverydayCVE/1.0"}
 MIN_CVSS = 7.0
@@ -293,6 +294,42 @@ def guess_product(desc):
     return "", "", ""
 
 
+def fetch_cna(cid):
+    """CNA fallback for CVEs NVD hasn't analyzed yet.
+
+    Fresh CVEs often publish with no CPE configuration data, which used to
+    render as "Pending NVD analysis" for days. The CVE Program's own API
+    carries the CNA's affected vendor/product from day one, so use that
+    instead of waiting for NVD enrichment.
+    """
+    try:
+        time.sleep(2)
+        with urlopen(Request(f"{CVE_API}/{cid}", headers=UA), timeout=30) as r:
+            d = json.load(r)
+    except Exception:
+        return "", "", ""
+    cna = d.get("containers", {}).get("cna", {})
+    for a in cna.get("affected", []) or []:
+        product = clean(a.get("product", ""))
+        if not product or product.lower() in ("n/a", "unknown"):
+            continue
+        vendor = clean(a.get("vendor", ""))
+        if vendor.lower() in ("n/a", "unknown"):
+            vendor = ""
+        vers = []
+        for v in a.get("versions", []) or []:
+            if v.get("status") != "affected":
+                continue
+            if v.get("lessThanOrEqual"):
+                vers.append(f"<= {v['lessThanOrEqual']}")
+            elif v.get("lessThan"):
+                vers.append(f"< {v['lessThan']}")
+            elif v.get("version") and v["version"].lower() not in ("n/a", "*"):
+                vers.append(v["version"].rstrip("."))
+        return vendor, product, "; ".join(vers[:2])
+    return "", "", ""
+
+
 def products(cve, desc=""):
     prods, vers, seen = [], [], set()
     vendors = []
@@ -317,6 +354,18 @@ def products(cve, desc=""):
                 if rng:
                     vers.append(f"{p[4].replace('_',' ')} {' '.join(rng)}")
     vendor = vendors[0] if vendors else ""
+    if not prods:
+        # NVD hasn't analyzed this CVE yet (no CPE data): use the CNA's own
+        # affected-product record from the CVE Program API before falling back
+        # to description regexes. Authoritative beats heuristic.
+        cid = cve.get("id", "")
+        if cid:
+            cv, cp, cvers = fetch_cna(cid)
+            if cp:
+                vendor = cv or vendor
+                prods.append(cp)
+                if cvers:
+                    vers.append(cvers)
     if not prods:
         g, gv, gvend = guess_product(desc)
         if g:
