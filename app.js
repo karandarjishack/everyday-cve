@@ -85,7 +85,7 @@ function render() {
         <span class="score ${esc(e.severity)}">${esc(e.score)}</span>
       </span>
       <span class="cve-id">${esc(e.id)}</span>
-      <span class="vendor">${esc(e.vendor || "Vendor pending")}</span>
+      ${e.vendor ? `<span class="vendor">${esc(e.vendor)}</span>` : ""}
       <span class="product">${esc(e.product || "Product pending NVD analysis")}${e.versions ? ` <span class="ver">${esc(e.versions)}</span>` : ""}</span>
       <span class="tile-foot">
         ${e.exploited ? `<span class="minichip kevflag">Exploited</span>` : (e.bug_class ? `<span class="minichip">${esc(e.bug_class)}</span>` : `<span></span>`)}
