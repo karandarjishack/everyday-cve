@@ -27,7 +27,7 @@
 
 <section class="hero">
   <div class="wrap">
-    <p class="kicker">Daily threat intelligence</p>
+    <p class="kicker"><span class="live-dot"></span>Daily threat intelligence</p>
     <h1>Every new CVE.<br><span class="accent">The problem. The solution.</span></h1>
     <p class="lede">Each morning we pull the last 24 hours of newly published vulnerabilities, flag what's exploited in the wild, and break down exactly what's wrong and how to fix it — all right here.</p>
     <div class="hero-stats" id="heroStats">
@@ -42,18 +42,38 @@
   <div class="wrap controls-inner">
     <select id="daySelect" aria-label="Pick a day"></select>
     <input id="search" type="search" placeholder="Search CVE, vendor, product…" aria-label="Search">
+    <select id="bugSelect" aria-label="Bug class"><option value="all">All bug classes</option></select>
     <div class="pills" id="sevPills">
       <button data-sev="all" class="active">All</button>
       <button data-sev="CRITICAL">Critical</button>
       <button data-sev="HIGH">High</button>
       <button data-sev="exploited">Exploited</button>
+      <button data-sev="stack">My stack</button>
     </div>
   </div>
 </div>
 
 <main class="wrap wide">
   <p class="resultline" id="resultline"></p>
-  <div id="grid" class="grid"></div>
+
+  <section class="stackbar" id="stackbar">
+    <div class="stack-head">
+      <span class="stack-title">My stack</span>
+      <span class="stack-sub">Add the products you run — matching CVEs get flagged instantly</span>
+    </div>
+    <div class="stack-row">
+      <input id="stackInput" placeholder="e.g. wordpress, apache, cisco, fortinet…" aria-label="Add a product to your stack">
+      <button id="stackAdd">Add</button>
+    </div>
+    <div class="stack-chips" id="stackChips"></div>
+  </section>
+
+  <section id="featuredWrap" class="hidden">
+    <h2 class="sechead"><span class="live-dot"></span>Today's top threats</h2>
+    <div id="featured" class="featured"></div>
+  </section>
+
+  <div id="sections"></div>
   <p class="empty hidden" id="empty">No CVEs match. Try another day or filter.</p>
 </main>
 
@@ -66,7 +86,7 @@
 
 <footer class="site-footer">
   <div class="wrap">
-    <p>Sources: <a href="https://nvd.nist.gov" target="_blank" rel="noopener">NVD (NIST)</a> · <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener">CISA Known Exploited Vulnerabilities</a> &nbsp;·&nbsp; Updated daily &nbsp;·&nbsp; Built by <a href="https://karandarjishack.github.io/kds/" target="_blank" rel="noopener">KDS — Karandarji Security</a></p>
+    <p>Sources: <a href="https://nvd.nist.gov" target="_blank" rel="noopener">NVD (NIST)</a> · <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener">CISA Known Exploited Vulnerabilities</a> &nbsp;·&nbsp; Updated daily &nbsp;·&nbsp; Built by KD</p>
   </div>
 </footer>
 
