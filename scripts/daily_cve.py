@@ -92,47 +92,204 @@ def cwes(cve):
                 out.add(d["value"])
     return sorted(out)
 
+NAME_CH = r"[\w\-\.\'&–—:(),/+ |\u200c\u200d]"
+GENERIC_FIRST = {"web", "the", "a", "an", "wp", "wordpress", "woocommerce", "backup",
+                 "file", "advanced", "ultimate", "free", "pro", "lite", "easy", "simple",
+                 "new", "best", "top", "super", "my", "our", "plugin", "theme", "premium"}
+ORG_SUFFIX = {"inc", "ltd", "llc", "gmbh", "group", "labs", "lab", "technologies",
+              "technology", "tech", "software", "systems", "system", "security", "sas",
+              "ab", "oy", "srl", "pty", "co", "corp", "studio", "studios", "team"}
 
-NAME_CH = r"[\w\-\.\'&–—:(),/+ ]"
-DESC_PATTERNS = [
-    # "The X plugin for WordPress ... up to, and including, 1.2.3"
-    (re.compile(r"The (.+?) plugin for WordPress", re.I),
-     lambda m, t: (f"{m.group(1).strip()} (WordPress plugin)",
-                   version_from(t), m.group(1).strip())),
-    # "Deserialization ... vulnerability in ThemeREX Group Booklovers booklovers allows"
-    (re.compile(r"vulnerability in ((?:[A-Z][\w&'\-–—]+)(?:\s+[A-Z][\w&'\-–—]+){0,1}) ([A-Z][\w\-–—]{1,40}) ([a-z][\w\-]{1,40}) allows"),
-     lambda m, t: (f"{m.group(2).strip()} ({m.group(1).strip()})",
-                   version_affects(t), m.group(1).strip())),
-    # "in SiteVault – Backup, Restore, Migration & Cloning <= 1.5.19"
-    (re.compile(r"\bin ([A-Z]" + NAME_CH + r"{1,60}?)\s*(<=|<|through|\bbefore\b|\bprior to\b)\s+([\d][\d.\-a-z]*)", re.I),
-     lambda m, t: (m.group(1).strip().rstrip(" –—-"),
-                   f"{'< ' if m.group(2) in ('before', 'prior to') else m.group(2) + ' '}{m.group(3).rstrip('.')}", "")),
-    # "This issue affects Veto: from n/a through 1.0.0"
-    (re.compile(r"This issue affects ([\w .&'\-–—]{2,50}?): from ([\w\d.\-/]+) through ([\d.\-]+)", re.I),
-     lambda m, t: (m.group(1).strip().title(),
-                   f"{m.group(2)} through {m.group(3).rstrip('.')}", "")),
-]
+
+def clean(s):
+    s = html.unescape(s or "")
+    s = re.sub(r"\s+", " ", s).strip().rstrip(" –—-|")
+    s = re.sub(r"\s+([.,;:])", r"\1", s)
+    return s.strip()
+
+
+def split_vendor_product(name):
+    """'Vendor – Product' / 'A | B' / 'VendorWord rest...' -> (vendor, product)."""
+    name = clean(name)
+    for sep in (" – ", " — ", " - "):
+        if sep in name:
+            v, p = (clean(x) for x in name.split(sep, 1))
+            return v, p
+    if "|" in name:
+        a, b = (clean(x) for x in name.split("|", 1))
+        prod = b if len(b) > len(a) else a
+        first = a.split(" ")[0] if a else ""
+        return first, prod or name
+    # drop a duplicated trailing "in X" fragment if the regex overshot
+    if " in " in name:
+        name = name.rsplit(" in ", 1)[1]
+    name = re.sub(r"^(the|a|an)\s+", "", name, flags=re.I)
+    first = name.split(" ")[0] if name else ""
+    if first and first.lower() not in GENERIC_FIRST \
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9&.'\-]*", first):
+        return first, name
+    # generic first word (e.g. "Web Plura ...") -> first two words as vendor
+    words = name.split(" ")
+    if len(words) > 1 and words[0].lower() in GENERIC_FIRST:
+        return " ".join(words[:2]), name
+    return "", name
+
+
+def split_org(name):
+    """'ThemeREX Group Let's Play' / 'rtCamp Inc. rtMedia for WordPress'
+    -> (vendor, product) using org-suffix detection."""
+    words = clean(name).split(" ")
+    for i, w in enumerate(words):
+        if w.rstrip(".").lower() in ORG_SUFFIX:
+            return " ".join(words[:i + 1]), " ".join(words[i + 1:])
+    if len(words) > 1:
+        return words[0], " ".join(words[1:])
+    return words[0] if words else "", ""
 
 
 def version_from(t):
-    v = re.search(r"(?:up to, and including,|before|<=|<|through)\s+([\d][\d\.\-a-z]*)", t or "")
-    return f"<= {v.group(1).rstrip('.')}" if v else ""
+    t = t or ""
+    m = re.search(r"up to, and including,?\s+([\d][\d.\-a-z]*)", t, re.I)
+    if m:
+        return f"<= {m.group(1).rstrip('.')}"
+    m = re.search(r"\bthrough\s+([\d][\d.\-a-z]*)", t, re.I)
+    if m:
+        return f"<= {m.group(1).rstrip('.')}"
+    m = re.search(r"\bbefore\s+([\d][\d.\-a-z]*)", t, re.I)
+    if m:
+        return f"< {m.group(1).rstrip('.')}"
+    m = re.search(r"(<=|<)\s*([\d][\d.\-a-z]*)", t)
+    if m:
+        return f"{m.group(1)} {m.group(2).rstrip('.')}"
+    return ""
 
 
 def version_affects(t):
-    v = re.search(r"This issue affects [\w .&'\-–—]{2,50}?: from ([\w\d.\-/]+) through ([\d.\-]+)", t or "", re.I)
+    v = re.search(r"This issue affects [\w .,&+'\-–—]{2,60}?: from ([\w\d.\-/]+) (?:through|before) ([\d.\-]+)", t or "", re.I)
     return f"{v.group(1)} through {v.group(2).rstrip('.')}" if v else ""
+
+
+def wp_plugin(m, t):
+    name = clean(m.group(1))
+    name = name.split("|")[0].strip()      # "Avada | Website Builder ..." -> "Avada"
+    name = name.split(":")[0].strip()      # "Listdom: AI-powered ..." -> "Listdom"
+    name = re.split(r"\s+[–—-]\s+", name)[0].strip()  # "User Frontend – Membership, ..." -> "User Frontend"
+    vend, prod = split_vendor_product(name)
+    kind = "theme" if "theme" in m.group(0).lower() else "plugin"
+    return f"{prod} (WordPress {kind})", version_from(t), vend
+
+
+def vuln_in_allows(m, t):
+    region = m.group(1)
+    # "vulnerability in the login handler that allows ..." -> prose, not a product
+    if re.match(r"^(the|a|an)\s+", region, re.I):
+        return "", "", ""
+    vend, prod = split_org(region)
+    prod = re.sub(r"\s+[a-z][\w\-]*$", "", prod)          # trailing slug word
+    prod = re.split(r",\s*(?=[A-Z][a-z]*(?:Press|Commerce))", prod)[0]  # platform list
+    prod = clean(prod)
+    # guard: must look like a product name, not "X that allows ..." prose
+    low = prod.lower()
+    if (not prod or low in ("that", "this", "these", "those", "it")
+            or re.match(r"^(and|or|the|a|an|that|this|these|those|it)\b", low)
+            or (not re.search(r"[A-Z]", prod) and len(prod) < 12)):
+        return "", "", ""
+    return prod, version_affects(t), vend
+
+
+def in_versioned(m, t):
+    vend, prod = split_vendor_product(m.group(1))
+    op = m.group(2)
+    op = "< " if op in ("before", "prior to") else op + " "
+    return prod, f"{op}{m.group(3).rstrip('.')}", vend
+
+
+def affects_from_through(m, t):
+    vend, prod = split_vendor_product(m.group(1))
+    return prod, f"{m.group(2)} through {m.group(3).rstrip('.')}", vend
+
+
+def starts_through(m, t):
+    prod = clean(m.group(1))
+    # guard: reject prose overshoot like "Foo 1.0 is bad, fixed in 2.0 through 3.0"
+    if "fixed in" in prod.lower() or len(re.findall(r"\d+\.\d+", prod)) > 1:
+        return "", "", ""
+    if " in " in prod:
+        prod = prod.rsplit(" in ", 1)[1]
+    prod = clean(prod)
+    if len(prod) > 80 or not prod:
+        return "", "", ""
+    base = clean(prod.split("(")[0])
+    vend, _ = split_vendor_product(base)
+    return prod, f"{m.group(2)} through {m.group(4).rstrip('.')}", vend or base
+
+
+def name_through(m, t):
+    prod = clean(m.group(1))
+    vend = clean(prod.split("(")[0]) if "(" in prod else prod
+    return prod, f"<= {m.group(2).rstrip('.')}", vend
+
+
+def name_before(m, t):
+    prod = clean(m.group(1))
+    return prod, f"< {m.group(2).rstrip('.')}", prod
+
+
+def name_contains(m, t):
+    prod = clean(m.group(1))
+    vend = clean(prod.split("(")[0]) if "(" in prod else prod
+    return prod, m.group(2).rstrip("."), vend
+
+
+def deserialization_of(m, t):
+    return clean(m.group(2)), version_affects(t), clean(m.group(1))
+
+
+def by_vendor(m, t):
+    prod = clean(m.group(1))
+    vend = clean(m.group(2))
+    vm = re.search(r"([\d][\d.\-a-z]*)\s+by\s+" + re.escape(vend), t or "")
+    return prod, vm.group(1).rstrip(".") if vm else "", vend
+
+
+DESC_PATTERNS = [
+    # "The LTL Freight Quotes WordPress plugin before 4.2.19" / "The Graphene theme for WordPress ..."
+    (re.compile(r"The (.+?)\s+(?:(plugin|theme) for WordPress|WordPress (plugin|theme))\b", re.I), wp_plugin),
+    # "Deserialization ... vulnerability in ThemeREX Group Let's Play playhockey allows ..."
+    (re.compile(r"vulnerability in (.+?)\s+(allows|allow|lets|let)(?![\w'])", re.I), vuln_in_allows),
+    # "This issue affects Veto: from n/a through 1.0.0"
+    (re.compile(r"This issue affects ([\w .&'\-–—]{2,60}?): from ([\w\d.\-/]+) through ([\d.\-]+)", re.I),
+     affects_from_through),
+    # "Unauthenticated RCE in SiteVault – Backup, Restore, Migration & Cloning <= 1.5.19"
+    (re.compile(r"\bin (" + r"[A-Z]" + NAME_CH + r"{1,160}?)\s*(<=|<|through|\bbefore\b|\bprior to\b)\s+([\d][\d.\-a-z]*)", re.I),
+     in_versioned),
+    # "Floci 1.1.0 before 2.2.0 contains ..." / "1MCP Agent (@1mcp/agent) 0.20.0 through 0.39.0 ..."
+    (re.compile(r"^(.+?)\s+([\d][\d.\-a-z]*)\s+(before|through)\s+v?([\d][\d.\-a-z]*)"), starts_through),
+    # "openapi-typescript-codegen through 0.31.0 contains ..." / "Open Source Social Network (OSSN) through 10.1 ..."
+    # "argocd-mcp (Argo CD MCP Server) through 0.9.0 ..." / "Helicone through v2025.08.21-1 ..."
+    (re.compile(r"^([A-Za-z][\w.\-() ]+?)\s+through\s+v?([\d][\d.\-a-z]*)"), name_through),
+    (re.compile(r"^([\w][\w.\-]*)\s+through\s+v?([\d][\d.\-a-z]*)"), name_through),
+    (re.compile(r"^([\w][\w.\-]*)\s+before\s+v?([\d][\d.\-a-z]*)"), name_before),
+    # "OpenLIT 2.1.0 contains an authorization bypass ..."
+    (re.compile(r"^([\w][\w.\-]*)\s+([\d][\d.\-a-z]*)\s+contains\b"), name_contains),
+    # "... deserialization of Apache DataSketches C++ ..."
+    (re.compile(r"\bdeserialization of ([A-Z][\w&.'\-–—]*)\s+([A-Z][\w+&.'\-–—]*(?:\s+[A-Z0-9+][\w+&.'\-–—]*)*)", re.I), deserialization_of),
+    # "ExifTool for photo and video 5.0.1-gms by CellHubs constructs ..."
+    (re.compile(r"^([A-Z][\w.\-]*)\b.*?\bby\s+([A-Z][\w&.'\-–—]+(?:\s+[A-Z][\w&.'\-–—]+){0,2})"), by_vendor),
+]
 
 
 def guess_product(desc):
     """Fallback: pull vendor/product/version from the description text,
     since fresh CVEs often have no CPE data yet."""
-    t = desc or ""
+    t = clean(desc)
     for rx, build in DESC_PATTERNS:
         m = rx.search(t)
         if m:
             product, vers, vendor = build(m, t)
-            return product, vers, vendor
+            product, vendor = clean(product), clean(vendor)
+            if product:
+                return product, vers, vendor
     return "", "", ""
 
 
@@ -167,10 +324,12 @@ def products(cve, desc=""):
             prods.append(g)
             if gv:
                 vers.append(gv)
-    if not vendor and prods and "(" not in prods[0]:
-        first = prods[0].split(" ")[0]
-        if re.fullmatch(r"[A-Za-z]{3,}", first or ""):
-            vendor = first
+    if not vendor and prods:
+        v, _ = split_vendor_product(prods[0].split(" (")[0])
+        if v and v.lower() != prods[0].lower():
+            vendor = v
+        elif v:
+            vendor = v  # single-token project name: project is the vendor
     return vendor, prods[:3], vers[:2]
 
 
