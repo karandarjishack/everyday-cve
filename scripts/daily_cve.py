@@ -93,22 +93,47 @@ def cwes(cve):
     return sorted(out)
 
 
+NAME_CH = r"[\w\-\.\'&–—:(),/+ ]"
+DESC_PATTERNS = [
+    # "The X plugin for WordPress ... up to, and including, 1.2.3"
+    (re.compile(r"The (.+?) plugin for WordPress", re.I),
+     lambda m, t: (f"{m.group(1).strip()} (WordPress plugin)",
+                   version_from(t), m.group(1).strip())),
+    # "Deserialization ... vulnerability in ThemeREX Group Booklovers booklovers allows"
+    (re.compile(r"vulnerability in ((?:[A-Z][\w&'\-–—]+)(?:\s+[A-Z][\w&'\-–—]+){0,1}) ([A-Z][\w\-–—]{1,40}) ([a-z][\w\-]{1,40}) allows"),
+     lambda m, t: (f"{m.group(2).strip()} ({m.group(1).strip()})",
+                   version_affects(t), m.group(1).strip())),
+    # "in SiteVault – Backup, Restore, Migration & Cloning <= 1.5.19"
+    (re.compile(r"\bin ([A-Z]" + NAME_CH + r"{1,60}?)\s*(<=|<|through|\bbefore\b|\bprior to\b)\s+([\d][\d.\-a-z]*)", re.I),
+     lambda m, t: (m.group(1).strip().rstrip(" –—-"),
+                   f"{'< ' if m.group(2) in ('before', 'prior to') else m.group(2) + ' '}{m.group(3).rstrip('.')}", "")),
+    # "This issue affects Veto: from n/a through 1.0.0"
+    (re.compile(r"This issue affects ([\w .&'\-–—]{2,50}?): from ([\w\d.\-/]+) through ([\d.\-]+)", re.I),
+     lambda m, t: (m.group(1).strip().title(),
+                   f"{m.group(2)} through {m.group(3).rstrip('.')}", "")),
+]
+
+
+def version_from(t):
+    v = re.search(r"(?:up to, and including,|before|<=|<|through)\s+([\d][\d\.\-a-z]*)", t or "")
+    return f"<= {v.group(1).rstrip('.')}" if v else ""
+
+
+def version_affects(t):
+    v = re.search(r"This issue affects [\w .&'\-–—]{2,50}?: from ([\w\d.\-/]+) through ([\d.\-]+)", t or "", re.I)
+    return f"{v.group(1)} through {v.group(2).rstrip('.')}" if v else ""
+
+
 def guess_product(desc):
-    """Fallback: pull product + affected version from the description text,
+    """Fallback: pull vendor/product/version from the description text,
     since fresh CVEs often have no CPE data yet."""
     t = desc or ""
-    m = re.search(r"The (.+?) plugin for WordPress", t)
-    if m:
-        name = m.group(1).strip()
-        v = re.search(r"(?:up to, and including,|before|<=|<|through)\s+([\d][\d\.\-a-z]*)", t)
-        return f"{name} (WordPress plugin)", (f"<= {v.group(1)}" if v else "")
-    m = re.search(r"\bin ([A-Z][\w\-\.\'& ]{2,60}?)\s+(?:before|prior to)\s+([\d][\d\.\-a-z]*)", t)
-    if m:
-        return m.group(1).strip(), f"< {m.group(2)}"
-    m = re.search(r"\bin ([A-Z][\w\-\.\'& ]{2,60}?)\s*(<=|<|through)\s*([\d][\d\.\-a-z]*)", t)
-    if m:
-        return m.group(1).strip(), f"{m.group(2)} {m.group(3)}"
-    return "", ""
+    for rx, build in DESC_PATTERNS:
+        m = rx.search(t)
+        if m:
+            product, vers, vendor = build(m, t)
+            return product, vers, vendor
+    return "", "", ""
 
 
 def products(cve, desc=""):
@@ -136,10 +161,9 @@ def products(cve, desc=""):
                     vers.append(f"{p[4].replace('_',' ')} {' '.join(rng)}")
     vendor = vendors[0] if vendors else ""
     if not prods:
-        g, gv = guess_product(desc)
+        g, gv, gvend = guess_product(desc)
         if g:
-            m2 = re.match(r"^(.+?) \(WordPress plugin\)$", g)
-            vendor = m2.group(1) if m2 else ""
+            vendor = gvend or vendor
             prods.append(g)
             if gv:
                 vers.append(f"{g} {gv}")
@@ -211,7 +235,7 @@ def main():
         av = re.search(r"AV:([NALP])", vector or "")
         scope = {"N": "remotely over the network", "A": "from the adjacent network",
                  "L": "with local access", "P": "with physical access"}.get(av.group(1) if av else "")
-        problem = one_line(desc) + (f" Attacker needs {scope}." if scope else "")
+        problem = one_line(desc, 1500) + (f" Attacker needs {scope}." if scope else "")
         solution = next((CWE_FIX[c][1] for c in cw if c in CWE_FIX),
                         "Apply the vendor patch at the earliest maintenance window and confirm the asset is not internet-exposed.")
         fix = re.search(r"(?:fixed in|update to|patched in)\s+(?:version\s+)?([\d][\d\.\-a-z]*)", desc, re.I)
